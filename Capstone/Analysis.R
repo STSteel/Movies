@@ -3,6 +3,7 @@ library(dplyr)
 library(caret)
 library(rpart)
 
+
 # Separate year both training and testing sets
 tidy_edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis=""))
 tidy_edx <- tidy_edx %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
