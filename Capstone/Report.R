@@ -123,8 +123,8 @@ rmses <- sapply(lambdas, function(l){
 
 qplot(lambdas, rmses)  
 lambda <- lambdas[which.min(rmses)]
-lambda # Best regularisation parameter
+print(c("Lamba = ", lambda)) # Best regularisation parameter
 
-rmse_results <- data.frame(method="Regularized Movie + User Effect Model", RMSE = min(rmses))
+rmse_results <- data.frame(method="Regularized Movie, User and Time Effect Model", RMSE = min(rmses))
 rmse_results %>% knitr::kable()
 
