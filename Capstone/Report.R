@@ -1,93 +1,5 @@
----
-title: "MovieLens"
-author: "Simone Trindade Steel"
-date: "17/05/2020"
-output:
-  pdf_document: default
-  html_document: default
----
+# Visualising relationships between rating and time (year) and genres 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-## R Markdown
-
-Executive Summary
-
-This report shows the RMSE evaluation of movie ratings predictions using the "edx" data set for training and the "validation" set for evaluation.
-
-After exploring the relationships between predictors, these are the key insights used in the construction of the prediction model:
-1. Ratings for films in recent decades have declined;
-2. There no indication that genre influences rating;
-3. Categorisation models are not appropriate for the prediction, however, rounding the predicted rating to the 
-
-
-
-```{r creation-of-data-sets, echo=FALSE}
-if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
-if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
-if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
-
-# MovieLens 10M dataset:
- # https://grouplens.org/datasets/movielens/10m/
- # http://files.grouplens.org/datasets/movielens/ml-10m.zip
-
-dl <- tempfile()
- download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
-
-ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
-                 col.names = c("userId", "movieId", "rating", "timestamp"))
-
-movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
- colnames(movies) <- c("movieId", "title", "genres")
- movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
-                                            title = as.character(title),
-                                            genres = as.character(genres))
-
-movielens <- left_join(ratings, movies, by = "movieId")
-
-# Validation set will be 10% of MovieLens data
-set.seed(1, sample.kind="Rounding")
-
-
-test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
- edx <- movielens[-test_index,]
- temp <- movielens[test_index,]
-
-# Make sure userId and movieId in validation set are also in edx set
-validation <- temp %>% 
-      semi_join(edx, by = "movieId") %>%
-      semi_join(edx, by = "userId")
-
-# Add rows removed from validation set back into edx set
-removed <- anti_join(temp, validation)
- edx <- rbind(edx, removed)
-
-rm(dl, ratings, movies, test_index, temp, movielens, removed)
-```
-
-## Glancing at the edx dataset used for training
-
-Structure and sample data:
-
-```{r edx-data}
-str(edx)
-head(edx)
-```
-
-## Preparing libraries
-```{r edx-libraries, echo=FALSE}
-library(tidyverse)
-library(dplyr)
-library(caret)
-library(rpart)
-library(ggplot2)
-```
-## Analysing rating and time relationship
-
-Ratings and time are weakly, but negatively correlated. Recent films have slightly lower ratings than older ones.
-```{r edx-analysis-time, echo=FALSE}
 # Glancing at decades, it appears that average ratings have been declining
 tidy_edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis=""))
 tidy_edx <- tidy_edx %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
@@ -99,11 +11,6 @@ tidy_edx %>%
   ggplot(aes(x=decade, y=m)) +
   geom_point()
 
-```
-## Analysing rating and genre relationship
-
-Looking into the most common genres (the ones with over one million reviews), ratings do not seem to vary across them.
-```{r edx-analysis-genre, echo=FALSE}
 # Glancing at genres, it appears that the most common ones don't have any significant relationship to ratings
 tidy_edx_genre <- edx %>% mutate(comedy=ifelse(str_detect(genres, "Comedy"), 1, 0),
                                  action=ifelse(str_detect(genres, "Action"), 1, 0),
@@ -131,11 +38,7 @@ tidy_edx_genre %>%
 
 rm(tidy_edx_genre) # free up memory
 
-```
-## Exploring genre and time together
 
-Similar conclusion is drawn when genre by decade analysis is performed. That is, no significant difference in trend.
-```{r edx-analysis-genre-time, echo=FALSE}
 # Genres that have over 1million entries: Action, Adventure, Comedy, Crime, Drama, Romance, Sci-Fi
 # Is there a trend by genre over time?
 tidy_edx <- tidy_edx %>% mutate(action=ifelse(str_detect(genres, "Action"), 1, 0),
@@ -166,11 +69,6 @@ validation <- validation %>% mutate(decade = round(year - 1900)/10)
 rm(tidy_edx) # free up memory
 
 
-```
-## Chosing an appropriate model: improving on Naive Bayse (movie, user and time biases), with regularisation to control for differences in number of ratings per movie
-
-
-```{r edx-analysis-model, echo=FALSE}
 # Strategy is to improving on Naive Bayes to minimise error: 
 # mean + movie bias + user bias + decade bias
 # (and adopting the best regularisation parameter: 5)
@@ -204,14 +102,6 @@ rmses <- sapply(lambdas, function(l){
   return(RMSE(predicted_ratings, validation$rating))
 })
 
-
-
-```
-## Results
-
-Utilising the best regularisation parameter (lamba=5), the optimal RMSE is achieved (0.8648377)
-
-```{r edx-analysis-results, echo=FALSE}
 qplot(lambdas, rmses)  
 lambda <- lambdas[which.min(rmses)]
 lambda # Best regularisation parameter
@@ -219,4 +109,4 @@ lambda # Best regularisation parameter
 rmse_results <- data.frame(method="Regularized Movie + User Effect Model", RMSE = min(rmses))
 rmse_results %>% knitr::kable()
 
-```
+
