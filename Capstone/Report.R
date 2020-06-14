@@ -1,4 +1,10 @@
-# Visualising relationships between rating and time (year) and genres 
+library(tidyverse)
+library(dplyr)
+library(caret)
+library(rpart)
+library(ggplot2)
+
+## Analysing rating and time relationship
 
 # Glancing at decades, it appears that average ratings have been declining
 tidy_edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis=""))
@@ -10,6 +16,8 @@ tidy_edx %>%
   summarise(m=mean(rating)) %>%
   ggplot(aes(x=decade, y=m)) +
   geom_point()
+
+## Analysing rating and genre relationship
 
 # Glancing at genres, it appears that the most common ones don't have any significant relationship to ratings
 tidy_edx_genre <- edx %>% mutate(comedy=ifelse(str_detect(genres, "Comedy"), 1, 0),
@@ -38,6 +46,7 @@ tidy_edx_genre %>%
 
 rm(tidy_edx_genre) # free up memory
 
+## Exploring genre and time together
 
 # Genres that have over 1million entries: Action, Adventure, Comedy, Crime, Drama, Romance, Sci-Fi
 # Is there a trend by genre over time?
@@ -47,7 +56,8 @@ tidy_edx <- tidy_edx %>% mutate(action=ifelse(str_detect(genres, "Action"), 1, 0
                                 crime=ifelse(str_detect(genres, "Crime"), 1, 0),
                                 drama=ifelse(str_detect(genres, "Drama"), 1, 0),
                                 romance=ifelse(str_detect(genres, "Romance"), 1, 0),
-                                scifi=ifelse(str_detect(genres, "Sci-Fi"), 1, 0)) %>%
+                                scifi=ifelse(str_detect(genres, "Sci-Fi"), 1, 0),
+                                thriller=ifelse(str_detect(genres, "Thriller"), 1, 0)) %>%
   gather("genre_name", "genre_value", action:scifi)
 
 tidy_edx %>%
@@ -60,14 +70,19 @@ tidy_edx %>%
 
 # Conclusion: there is no significant difference by genre, 
 # therefore, classification models will be discarded (nearest neighbours, decision trees, clustering)
+rm(tidy_edx) # free up memory
 
-edx <- tidy_edx
+edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis="")) 
+edx <- edx %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
+edx <- edx %>% mutate(year = as.numeric(year))
+edx <- edx %>% mutate(decade = round(year - 1900)/10)
+
 validation <- validation %>% mutate(year = str_trunc(title, 5, side="left", ellipsis="")) 
 validation <- validation %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
 validation <- validation %>% mutate(year = as.numeric(year))
 validation <- validation %>% mutate(decade = round(year - 1900)/10)
-rm(tidy_edx) # free up memory
 
+## Chosing an appropriate model: improving on Naive Bayes (movie, user and time biases), with regularisation to control for differences in number of ratings per movie
 
 # Strategy is to improving on Naive Bayes to minimise error: 
 # mean + movie bias + user bias + decade bias
@@ -97,10 +112,14 @@ rmses <- sapply(lambdas, function(l){
     left_join(b_m, by = "movieId") %>%
     left_join(b_u, by = "userId") %>%
     left_join(b_t, by = "decade") %>%
-  mutate(pred = m_movie + b_m + b_u + b_t) %>%
+    mutate(pred = m_movie + b_m + b_u + b_t) %>%
     .$pred
   return(RMSE(predicted_ratings, validation$rating))
 })
+
+
+## Results
+
 
 qplot(lambdas, rmses)  
 lambda <- lambdas[which.min(rmses)]
@@ -108,5 +127,4 @@ lambda # Best regularisation parameter
 
 rmse_results <- data.frame(method="Regularized Movie + User Effect Model", RMSE = min(rmses))
 rmse_results %>% knitr::kable()
-
 

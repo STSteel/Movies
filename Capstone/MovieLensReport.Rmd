@@ -4,23 +4,23 @@ author: "Simone Trindade Steel"
 date: "17/05/2020"
 output:
   pdf_document: default
-  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-Executive Summary
+## Executive Summary
 
 This report shows the RMSE evaluation of movie ratings predictions using the "edx" data set for training and the "validation" set for evaluation.
 
 After exploring the relationships between predictors, these are the key insights used in the construction of the prediction model:
+
 1. Ratings for films in recent decades have declined;
+
 2. There no indication that genre influences rating;
-3. Categorisation models are not appropriate for the prediction, however, rounding the predicted rating to the 
+
+3. Categorisation models are not appropriate for the prediction. However, rounding the predicted rating to the nearest integers (as if rating were a category) after using movie, user and decade as predictors, reduced RMSE.
 
 
 
@@ -76,7 +76,7 @@ str(edx)
 head(edx)
 ```
 
-## Preparing libraries
+
 ```{r edx-libraries, echo=FALSE}
 library(tidyverse)
 library(dplyr)
@@ -100,9 +100,11 @@ tidy_edx %>%
   geom_point()
 
 ```
+
 ## Analysing rating and genre relationship
 
 Looking into the most common genres (the ones with over one million reviews), ratings do not seem to vary across them.
+
 ```{r edx-analysis-genre, echo=FALSE}
 # Glancing at genres, it appears that the most common ones don't have any significant relationship to ratings
 tidy_edx_genre <- edx %>% mutate(comedy=ifelse(str_detect(genres, "Comedy"), 1, 0),
@@ -144,7 +146,8 @@ tidy_edx <- tidy_edx %>% mutate(action=ifelse(str_detect(genres, "Action"), 1, 0
                                 crime=ifelse(str_detect(genres, "Crime"), 1, 0),
                                 drama=ifelse(str_detect(genres, "Drama"), 1, 0),
                                 romance=ifelse(str_detect(genres, "Romance"), 1, 0),
-                                scifi=ifelse(str_detect(genres, "Sci-Fi"), 1, 0)) %>%
+                                scifi=ifelse(str_detect(genres, "Sci-Fi"), 1, 0),
+                                thriller=ifelse(str_detect(genres, "Thriller"), 1, 0)) %>%
   gather("genre_name", "genre_value", action:scifi)
 
 tidy_edx %>%
@@ -157,17 +160,22 @@ tidy_edx %>%
 
 # Conclusion: there is no significant difference by genre, 
 # therefore, classification models will be discarded (nearest neighbours, decision trees, clustering)
+rm(tidy_edx) # free up memory
 
-edx <- tidy_edx
+edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis="")) 
+edx <- edx %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
+edx <- edx %>% mutate(year = as.numeric(year))
+edx <- edx %>% mutate(decade = round(year - 1900)/10)
+
 validation <- validation %>% mutate(year = str_trunc(title, 5, side="left", ellipsis="")) 
 validation <- validation %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
 validation <- validation %>% mutate(year = as.numeric(year))
 validation <- validation %>% mutate(decade = round(year - 1900)/10)
-rm(tidy_edx) # free up memory
-
 
 ```
-## Chosing an appropriate model: improving on Naive Bayse (movie, user and time biases), with regularisation to control for differences in number of ratings per movie
+
+
+## Chosing an appropriate model: improving on Naive Bayes (movie, user and time biases), with regularisation to control for differences in number of ratings per movie
 
 
 ```{r edx-analysis-model, echo=FALSE}
@@ -207,9 +215,10 @@ rmses <- sapply(lambdas, function(l){
 
 
 ```
+
 ## Results
 
-Utilising the best regularisation parameter (lamba=5), the optimal RMSE is achieved (0.8648377)
+Utilising the best regularisation parameter that minimises RMSE.
 
 ```{r edx-analysis-results, echo=FALSE}
 qplot(lambdas, rmses)  
