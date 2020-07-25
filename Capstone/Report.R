@@ -1,10 +1,68 @@
+##########################################################
+# Create edx set, validation set (final hold-out test set)
+##########################################################
+
+# Note: this process could take a couple of minutes
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+
+library(stringr)
 library(tidyverse)
 library(dplyr)
 library(caret)
 library(rpart)
 library(ggplot2)
+library(tinytex)
 
-## Analysing rating and time relationship
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+# if using R 4.0 or later
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding")
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
+##########################################################
+# Structure and sample rows
+##########################################################
+str(edx)
+head(edx)
+
+##########################################################
+# Analysing rating and time relationship
+##########################################################
 
 # Glancing at decades, it appears that average ratings have been declining
 tidy_edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis=""))
@@ -17,7 +75,9 @@ tidy_edx %>%
   ggplot(aes(x=decade, y=m)) +
   geom_point()
 
-## Analysing rating and genre relationship
+##########################################################
+# Analysing rating and genre relationship
+##########################################################
 
 # Glancing at genres, it appears that the most common ones don't have any significant relationship to ratings
 tidy_edx_genre <- edx %>% mutate(comedy=ifelse(str_detect(genres, "Comedy"), 1, 0),
@@ -46,7 +106,9 @@ tidy_edx_genre %>%
 
 rm(tidy_edx_genre) # free up memory
 
-## Exploring genre and time together
+##########################################################
+# Exploring genre and time together
+##########################################################
 
 # Genres that have over 1million entries: Action, Adventure, Comedy, Crime, Drama, Romance, Sci-Fi
 # Is there a trend by genre over time?
@@ -72,6 +134,8 @@ tidy_edx %>%
 # therefore, classification models will be discarded (nearest neighbours, decision trees, clustering)
 rm(tidy_edx) # free up memory
 
+# Add decade to training and test data sets
+
 edx <- edx %>% mutate(year = str_trunc(title, 5, side="left", ellipsis="")) 
 edx <- edx %>% mutate(year = str_trunc(year, 4, side="right", ellipsis=""))
 edx <- edx %>% mutate(year = as.numeric(year))
@@ -82,7 +146,9 @@ validation <- validation %>% mutate(year = str_trunc(year, 4, side="right", elli
 validation <- validation %>% mutate(year = as.numeric(year))
 validation <- validation %>% mutate(decade = round(year - 1900)/10)
 
-## Chosing an appropriate model: improving on Naive Bayes (movie, user and time biases), with regularisation to control for differences in number of ratings per movie
+##########################################################
+## Chosing an appropriate predictive model
+##########################################################
 
 # Strategy is to improving on Naive Bayes to minimise error: 
 # mean + movie bias + user bias + decade bias
@@ -118,13 +184,12 @@ rmses <- sapply(lambdas, function(l){
 })
 
 
+##########################################################
 ## Results
+##########################################################
 
-
-qplot(lambdas, rmses)  
 lambda <- lambdas[which.min(rmses)]
 print(c("Lamba = ", lambda)) # Best regularisation parameter
-
+qplot(lambdas, rmses)  
 rmse_results <- data.frame(method="Regularized Movie, User and Time Effect Model", RMSE = min(rmses))
 rmse_results %>% knitr::kable()
-
